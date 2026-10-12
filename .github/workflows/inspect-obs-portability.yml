@@ -1,0 +1,58 @@
+name: Inspect OBS Screen Recorder Portability
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repository:
+        description: 'OBS source repo (owner/repo); blank = official OBS'
+        required: false
+        type: string
+        default: 'obsproject/obs-studio'
+      source_ref:
+        description: 'Source branch, release tag, or commit'
+        required: true
+        type: string
+        default: 'master'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: obs-portability-inspection
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect source (no compilation)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout inspection scripts
+        uses: actions/checkout@v4
+
+      - name: Checkout selected upstream OBS source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.source_repository }}
+          ref: ${{ inputs.source_ref }}
+          path: obs-source
+          persist-credentials: false
+          submodules: false
+          fetch-depth: 1
+
+      - name: Inspect paths, hook deployment, capture and audio components
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/Inspect-OBS-Portability.py \
+            --source obs-source \
+            --output inspection-results
+
+      - name: Upload source inspection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: OBS-ScreenRecorder-Portability-Inspection-${{ github.run_id }}
+          path: inspection-results/
+          retention-days: 30
+          if-no-files-found: warn
